@@ -9,12 +9,51 @@
 #define builder_cc(cmd) cmd_append(cmd, "cc")
 #define builder_output(cmd, output_path) cmd_append(cmd, "-o", output_path)
 #define builder_inputs(cmd, ...) cmd_append(cmd, __VA_ARGS__)
-#define builder_libs(cmd) cmd_append(cmd, "-lm")
+#define builder_libs(cmd)                                                      \
+  cmd_append(cmd, "-lleif", "-lrunara", "-lm", "-lGL", "-lX11", "-lXrender",   \
+             "-lfreetype", "-lfontconfig", "-lharfbuzz", "-lglfw")
 #define builder_flags(cmd)                                                     \
   cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-ggdb")
 #define builder_include_path(cmd, include_path)                                \
   cmd_append(cmd, temp_sprintf("-I%s", include_path))
 
+void builder_inputs_auto(Nob_Cmd *cmd, const char *path);
+
+int main(int argc, char *argv[]) {
+  NOB_GO_REBUILD_URSELF(argc, argv);
+
+  Nob_Cmd cmd = {0};
+
+  builder_cc(&cmd);
+  builder_output(&cmd, "main");
+  builder_inputs_auto(&cmd, ".");
+  builder_libs(&cmd);
+  builder_flags(&cmd);
+
+  if (!cmd_run_sync_and_reset(&cmd))
+    return 1;
+
+  const char *program_name = shift(argv, argc);
+
+  if (argc > 0) {
+    const char *subcommand = shift(argv, argc);
+
+    if (strcmp(subcommand, "run") == 0) {
+      cmd_append(&cmd, "./main");
+      if (!cmd_run_sync_and_reset(&cmd))
+        return 1;
+    } else if (strcmp(subcommand, "gui") == 0) {
+      cmd_append(&cmd, "./main", "gui");
+    } else {
+      nob_log(ERROR, "Unknown command: %s", subcommand);
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+// Impl
 void builder_inputs_auto(Nob_Cmd *cmd, const char *path) {
   DIR *dir = opendir(path);
   if (!dir) {
@@ -48,37 +87,4 @@ void builder_inputs_auto(Nob_Cmd *cmd, const char *path) {
   }
 
   closedir(dir);
-}
-
-int main(int argc, char *argv[]) {
-  NOB_GO_REBUILD_URSELF(argc, argv);
-
-  Nob_Cmd cmd = {0};
-
-  builder_cc(&cmd);
-  builder_output(&cmd, "main");
-  builder_inputs_auto(&cmd, ".");
-  builder_flags(&cmd);
-
-  if (!cmd_run_sync_and_reset(&cmd))
-    return 1;
-
-  const char *program_name = shift(argv, argc);
-
-  if (argc > 0) {
-    const char *subcommand = shift(argv, argc);
-
-    if (strcmp(subcommand, "run") == 0) {
-      cmd_append(&cmd, "./main");
-      if (!cmd_run_sync_and_reset(&cmd))
-        return 1;
-    } else if (strcmp(subcommand, "gui") == 0) {
-      cmd_append(&cmd, "./main", "gui");
-    } else {
-      nob_log(ERROR, "Unknown command: %s", subcommand);
-      return 1;
-    }
-  }
-
-  return 0;
 }
